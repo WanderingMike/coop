@@ -21,6 +21,7 @@ class Product:
     '''Each discounted product becomes its own object'''
 
     def __init__(self):
+        self.items = dict()
         self.title = str()
         self.saving = float()
         self.price = float()
@@ -28,12 +29,11 @@ class Product:
         self.udoCat = list()
 
     def sanitise(self):
-        print("sanitising")
-        self.title = self.title
-        print(self.saving)
-        print(self.price)
-        self.saving = float(self.saving)
-        self.price = float(self.price)
+        self.title = self.items["title"]
+        self.saving = self.items["saving"]
+        self.price = self.items["price"]
+        self.savingText = self.items["savingText"]
+        self.udoCat = self.items["udoCat"]
 
     def clean_title(self, string):
         string.lower()
@@ -59,40 +59,60 @@ def create_products(data, pointers):
                 product_obj = populate_product(product) 
                 print(product_obj.title)
                 pointers[product_obj.title] = product_obj
-            except:
-                print("missing this value")
+            except Exception as e:
+                print(e, ", missing this value")
 
         return pointers
 
 
 def populate_product(product):
-    
+
     try:
 
         obj = Product()
 
+        items = {"title": None,
+                "saving": None,
+                "price": None,
+                "savingText": None,
+                "udoCat": None}
+                    
         for datapoint, value in product.items():
-            if datapoint in ["title", "saving", "price", "savingText", "udoCat"]:
-                exec("""obj.%s ="%s" """ % (datapoint, value))
+            if datapoint in items.keys():
+                print(datapoint, value)
+                items[datapoint] = value
+                obj.items = items
 
-        print(obj.udoCat)
+
         obj.sanitise()
         return obj
 
-    except:
+    except Exception as e:
+        print(e)
         return None
 
 
 
 def build_tree(pointers):
 
-    for obj in pointers:
+    coop = Node("Coop")
+
+    for obj in pointers.values():
         edges = obj.udoCat
+        print(edges)
+        root = coop
 
         for edge in edges:
             # create edge if it doesn't exist yet
             # link product to the leaf
-            print("Hello")
+            print(root)
+            if edge not in root.children:
+                temp = Node(edge, parent=root, tag="branch")
+                root = temp
+            else findall_by_attr(edge
+
+    for pre, fill, node in RenderTree(coop):
+        print("%s%s" % (pre, node.name))
 
 
 def read_html_file():
@@ -111,7 +131,6 @@ def garbage_leaves():
 
 
 if __name__=="__main__":
-    input()
     if is_monday():
         print("yes")
         garbage_leaves()
