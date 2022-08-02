@@ -3,19 +3,12 @@ import requests
 #from bs4 import BeautifulSoup
 import re
 #from requests_html import HTMLSession
-#import pprint
+#import pprinti
+from yattag import Doc
 import json
 from datetime import datetime as dt
 from anytree import Node, NodeMixin, RenderTree
-
-class MyClass(NodeMixin): # Add Node feature ...
-    def __init__(self, name, length, width, tag, parent=None):
-        super(MyClass, self).__init__()
-        self.name = name
-        self.length = length
-        self.width = width
-        self.parent = parent
-        self.tag = tag
+from anytree.search import findall_by_attr
 
 class Product:
     '''Each discounted product becomes its own object'''
@@ -27,31 +20,34 @@ class Product:
         self.price = float()
         self.savingText = str()
         self.udoCat = list()
+        self.image = str()
+        self.percentage = float()
+        self.min_purchase = int()
 
     def sanitise(self):
-        self.title = self.items["title"]
+        self.title = self.items["title"].lower()
         self.saving = self.items["saving"]
         self.price = self.items["price"]
         self.savingText = self.items["savingText"]
         self.udoCat = self.items["udoCat"]
+        self.image = "https:" + self.items["image"]["srcset"][-1][0]
+        print(self.image)
+        print(self.title)
+        print(self.saving)
+        print(self.price)
+        print(self.savingText)
 
     def clean_title(self, string):
         string.lower()
 
 
-def strip(text):
-    pattern = r"<meta data-pagecontent-json='(.*?)'>"
-    match=re.findall(pattern, text)
-    json_data = json.loads(match[0])
-    anchors = json_data["anchors"]
-    return anchors
     
 
 def create_products(data, pointers):
     # We need the title, the title, the original price, the new price, the saving text, the categories and the image 
-    for main_cat in range(len(data)):
+    for main_cat in data:
 
-        products = data[main_cat]["json"]["elements"]
+        products = main_cat["json"]["elements"]
 
         for product in products:
 
@@ -62,27 +58,26 @@ def create_products(data, pointers):
             except Exception as e:
                 print(e, ", missing this value")
 
-        return pointers
+    return pointers
 
 
 def populate_product(product):
 
     try:
-
+        print(product)
         obj = Product()
 
         items = {"title": None,
                 "saving": None,
                 "price": None,
                 "savingText": None,
-                "udoCat": None}
+                "udoCat": None,
+                "image": None}
                     
         for datapoint, value in product.items():
             if datapoint in items.keys():
-                print(datapoint, value)
                 items[datapoint] = value
                 obj.items = items
-
 
         obj.sanitise()
         return obj
@@ -90,6 +85,12 @@ def populate_product(product):
     except Exception as e:
         print(e)
         return None
+
+def make_title(title, promotion):
+    try:
+        return "{} ({})".format(title, promotion)
+    except:
+        return title
 
 
 
@@ -99,20 +100,26 @@ def build_tree(pointers):
 
     for obj in pointers.values():
         edges = obj.udoCat
-        print(edges)
-        root = coop
+        HEAD = coop
 
         for edge in edges:
             # create edge if it doesn't exist yet
             # link product to the leaf
-            print(root)
-            if edge not in root.children:
-                temp = Node(edge, parent=root, tag="branch")
-                root = temp
-            else findall_by_attr(edge
+            
+            if (answer := findall_by_attr(coop, edge)):
+                HEAD = answer[0]
+
+            else:
+                temp = Node(edge, parent=HEAD, tag="branch")
+                HEAD = temp
+        
+        product_title = make_title(obj.title, obj.savingText)
+        __product = Node(product_title, parent=HEAD, tag="product")
 
     for pre, fill, node in RenderTree(coop):
         print("%s%s" % (pre, node.name))
+
+    return coop
 
 
 def read_html_file():
@@ -129,13 +136,87 @@ def garbage_leaves():
     """Go through all nodes and delete all product leaf nodes."""
     ##for every node, if tag is product, then prune
 
+def query_filter():
 
-if __name__=="__main__":
+    with open("files/keywords.txt") as f:
+        inpt = f.read()
+
+    exprs_pattern = r'"(.*?)"'
+    exprs = re.findall(exprs_pattern, inpt)
+    re.sub(r'"(.*?)"', "", inpt)
+    single_words = re.split(r"\t|\n| ", inpt)
+    keywords = single_words + exprs
+    keywords = [word for word in keywords if word != " "]
+
+    selected_objects = list()
+    ## based on keywords
+    for title in pointers.keys():
+        for word in keywords:
+            if word in title:
+                product = pointers[title]
+                selected_objects.append(product)
+
+    ## based on high discounts
+    big_whales = list()
+
+    ## based on categories
+    basket_selection = list()
+
+    return selected_objects, big_whales, basket_selection
+
+
+def display_products(objects, filename, title):
+    doc, tag, text = Doc().tagtext()
+    with tag('html'):
+            with tag('body'):
+                with tag('h1', id = 'main'):
+                    text(title)
+                    with tag('h3'):
+                        for obj in objects:
+                            with tag('p'):
+                                text(obj.title)
+                            with tag('p'):
+                                text(obj.savingText)
+                            with tag('img', src=obj.image):
+                                text("Image")
+
+    with open('{}.html'.format(filename), 'w') as f:
+        f.write(doc.getvalue())
+
+
+def display_tree(selected_objects, tree):
+
+    doc, tag, text = Doc().tagtext()
+    tree_struct = ""
+    for pre, fill, node in RenderTree(tree):
+        tree_struct += "%s%s\n" % (pre, node.name)
+
+
+    with tag('html'):
+        with tag('body'):
+            with tag('h1', id = 'main'):
+                text("All categories and current discounts")
+            with tag('span', style = "white-space: pre"):
+                text(tree_struct)
+
+    result = doc.getvalue()
+
+    with open('tree.html', 'w') as f:
+        f.write(doc.getvalue())
+                
+
+def strip(text):
+    pattern = r"<meta data-pagecontent-json='(.*?)'>"
+    match=re.findall(pattern, text)
+    json_data = json.loads(match[0])
+    anchors = json_data["anchors"]
+    return anchors
+
+def main_loop():
     if is_monday():
-        print("yes")
         garbage_leaves()
 
-    offline = True
+    offline = False
     if offline:
         lines = read_html_file()
         content = strip(lines)
@@ -143,10 +224,21 @@ if __name__=="__main__":
         url = "https://www.coop.ch/en/promotions/weekly-special-offers/c/m_1011"
         session = requests.get(url)
         content = strip(session.text)
+        print(content)
 
     product_pointers_empty = dict()
     product_pointers = create_products(content, product_pointers_empty)
-    build_tree(product_pointers)
+    tree = build_tree(product_pointers)
+    selected, whales, cats = query_filter()
+
+    display_products(selected, filename="selection", title="Your wishlist")
+    display_products(whales, filename="whales", title="$$$ Big discounts $$$")
+    display_products(cats, filename="basket", title="Your baskets are offering...")
+    display_tree(tree)
+
+
+if __name__=="__main__":
+    main_loop()
 
 
 
@@ -163,27 +255,3 @@ if __name__=="__main__":
 
 
 
-
-
-#session = HTMLSession()
-#r = session.get(URL)
-#r.html.render()
-#print(r.text)
-#with open('readme.txt', 'w') as f:
-#    f.write(r.text)
-#print(r.html.search('cmsTeaserRow'))
-
-#r.html.search("Watermelon")
-
-#page = requests.get(URL)
-#soup = BeautifulSoup(page.content, "html.parser")
-
-#
-#job_elements = soup.find_all("div", class_="product-carousel__stage")
-#print(job_elements)
-#
-### delete <script> and <template> content
-#pattern_script = r"(<script>.*?</script>)"
-#pattern_template = r"<template>(.*?)</template>"
-#
-##match=re.findall(pattern_script, soup)
