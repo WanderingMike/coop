@@ -1,0 +1,92 @@
+/* override sc-id styles for a shop, must be included after the main sc-id.css */
+.sc-id-wrapper .sc-id__btn:not(:disabled).sc-id__btn--shopcolor1 {
+    /* button background-color */
+    background-color: #FF8C00;
+}
+
+.sc-id-wrapper .sc-id__btn:not(:disabled).sc-id__btn--shopcolor1:hover {
+    /* button hover background-color */
+    background-color: #FFA940;
+}
+
+.sc-id-wrapper .sc-id__link--shopcolor1 {
+    /* link color */
+    color: #FF8C00;
+}
+
+.sc-id-wrapper .sc-id__link--shopcolor1:hover {
+    /* link hover color */
+    color: #FFA940;
+}
+
+.sc-id-header {
+    /* top border for inline sc-id windows */
+    border-top-color: #FF8C00;
+}
+
+.sc-id-modal__content:before {
+    /* top border for sc-id modals */
+    background: #FF8C00;
+}
+
+.sc-id-modal__wrapper .sc-id__btn--black {
+    background-color: #FF8C00 !important;
+}
+
+.sc-id-modal__wrapper .sc-id__btn--black:hover {
+    background-color: #FFA940 !important;
+}
+
+.sc-id-wrapper .sc-id__btn:not(:disabled).sc-id__btn--black,
+.sc-id-wrapper .sc-id__btn:not(:disabled).sc-id__btn--shopcolor1 {
+    background-color: #FF8C00 !important;
+}
+
+.sc-id-wrapper .sc-id__btn:not(:disabled).sc-id__btn--black:hover,
+.sc-id-wrapper .sc-id__btn:not(:disabled).sc-id__btn--shopcolor1:hover {
+    background-color: #FFA940 !important;
+}
+
+/* Color for club modals */
+.sc-id-modal-club__container .sc-id-modal__content:before {
+    /* top border for sc-id modals */
+    background: #5A3C4E;
+}
+
+.sc-id-modal-club__container .sc-id-modal__wrapper .sc-id__btn--black {
+    background-color: #67326C !important;
+}
+
+.sc-id-modal-club__container .sc-id-modal__wrapper .sc-id__btn--black:hover {
+    background-color: #531E59 !important;
+}
+
+.sc-id-modal-club__container .sc-id-wrapper .sc-id__btn:not(:disabled).sc-id__btn--black,
+.sc-id-modal-club__container .sc-id-wrapper .sc-id__btn:not(:disabled).sc-id__btn--shopcolor1 {
+    background-color: #67326C !important;
+}
+
+.sc-id-modal-club__container .sc-id-wrapper .sc-id__btn:not(:disabled).sc-id__btn--black:hover,
+.sc-id-modal-club__container .sc-id-wrapper .sc-id__btn:not(:disabled).sc-id__btn--shopcolor1:hover {
+    background-color: #531E59 !important;
+}
+
+
+.sc-id-modal-club__container .sc-id-wrapper .sc-id__link--shopcolor1 {
+    /* link color */
+    color: #67326C;
+}
+
+.sc-id-modal-club__container .sc-id-wrapper .sc-id__link--shopcolor1:hover {
+    /* link hover color */
+    color: #531E59;
+}
+
+.icon-sc-cancel::before {
+    font-family: "fontello";
+    content: "\e802";
+    color: #FF8C00;
+}
+
+
+@font-face { font-family: 'fontello'; src:  url('/_ui/desktop/common/fonts/fontello.woff2?22.7.0.1510') format('woff2'), url('/_ui/desktop/common/fonts/fontello.woff?22.7.0.1510') format('woff'), url('/_ui/desktop/common/fonts/fontello.ttf?22.7.0.1510') format('truetype'); font-weight: normal; font-style: normal;}

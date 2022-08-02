@@ -1,12 +1,25 @@
 #!/usr/bin/python3
 import requests
-from bs4 import BeautifulSoup
+#from bs4 import BeautifulSoup
 import re
-from requests_html import HTMLSession
-import pprint
+#from requests_html import HTMLSession
+#import pprint
 import json
+from datetime import datetime as dt
+from anytree import Node, NodeMixin, RenderTree
+
+class MyClass(NodeMixin): # Add Node feature ...
+    def __init__(self, name, length, width, tag, parent=None):
+        super(MyClass, self).__init__()
+        self.name = name
+        self.length = length
+        self.width = width
+        self.parent = parent
+        self.tag = tag
 
 class Product:
+    '''Each discounted product becomes its own object'''
+
     def __init__(self):
         self.title = str()
         self.saving = float()
@@ -25,10 +38,10 @@ class Product:
     def clean_title(self, string):
         string.lower()
 
-def download_data(url):
-    session = requests.get(url)
+
+def strip(text):
     pattern = r"<meta data-pagecontent-json='(.*?)'>"
-    match=re.findall(pattern, session.text)
+    match=re.findall(pattern, text)
     json_data = json.loads(match[0])
     anchors = json_data["anchors"]
     return anchors
@@ -49,36 +62,73 @@ def create_products(data, pointers):
             except:
                 print("missing this value")
 
-
+        return pointers
 
 
 def populate_product(product):
     
     try:
+
         obj = Product()
 
         for datapoint, value in product.items():
             if datapoint in ["title", "saving", "price", "savingText", "udoCat"]:
                 exec("""obj.%s ="%s" """ % (datapoint, value))
 
-        print(obj.title)
+        print(obj.udoCat)
+        obj.sanitise()
+        return obj
+
     except:
-        print("missing {}".format(value))
-
-    obj.sanitise()
-    return obj
-    
+        return None
 
 
 
+def build_tree(pointers):
 
+    for obj in pointers:
+        edges = obj.udoCat
+
+        for edge in edges:
+            # create edge if it doesn't exist yet
+            # link product to the leaf
+            print("Hello")
+
+
+def read_html_file():
+    with open("files/webpage.txt", encoding="utf-8") as f:
+        text = f.read()
+    return text
+
+
+def is_monday():
+    return True if dt.weekday(dt.now()) == 0 else False
+
+
+def garbage_leaves():
+    """Go through all nodes and delete all product leaf nodes."""
+    ##for every node, if tag is product, then prune
 
 
 if __name__=="__main__":
-    URL_coop = "https://www.coop.ch/en/promotions/weekly-special-offers/c/m_1011"
-    content = download_data(URL_coop)
-    product_pointers = dict()
-    create_products(content, product_pointers)
+    input()
+    if is_monday():
+        print("yes")
+        garbage_leaves()
+
+    offline = True
+    if offline:
+        lines = read_html_file()
+        content = strip(lines)
+    else:
+        url = "https://www.coop.ch/en/promotions/weekly-special-offers/c/m_1011"
+        session = requests.get(url)
+        content = strip(session.text)
+
+    product_pointers_empty = dict()
+    product_pointers = create_products(content, product_pointers_empty)
+    build_tree(product_pointers)
+
 
 
 
