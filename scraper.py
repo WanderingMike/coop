@@ -3,19 +3,20 @@ import requests
 #from bs4 import BeautifulSoup
 import re
 #from requests_html import HTMLSession
-#import pprinti
+from pprint import pprint
 from yattag import Doc
 import json
 from datetime import datetime as dt
 from anytree import Node, NodeMixin, RenderTree
-from anytree.search import findall_by_attr
+from anytree.search import findall_by_attr, findall, find
+from anytree.exporter.dictexporter import DictExporter
+from anytree.importer import DictImporter
 
-class Product:
-    '''Each discounted product becomes its own object'''
+
+class Item(Node):
 
     def __init__(self):
         self.items = dict()
-        self.title = str()
         self.saving = float()
         self.price = float()
         self.savingText = str()
@@ -23,16 +24,24 @@ class Product:
         self.image = str()
         self.percentage = float()
         self.min_purchase = int()
+        self.tag = str()
 
     def sanitise(self):
-        self.title = self.items["title"].lower()
+        self.name = self.items["title"].lower()
+        self.tag = "product"
         self.saving = self.items["saving"]
         self.price = self.items["price"]
         self.savingText = self.items["savingText"]
+        if not self.savingText:
+            self.savingText = "Special bonus at price %s" % (self.price)
         self.udoCat = self.items["udoCat"]
         self.image = "https:" + self.items["image"]["srcset"][-1][0]
-        print(self.image)
-        print(self.title)
+        self.percentage, self.min_purchase = match_text(self.savingText)
+        if not self.savingText:
+            self.savingText = "Sale"
+        print(self.name)
+        print(self.percentage)
+        print(self.min_purchase)
         print(self.saving)
         print(self.price)
         print(self.savingText)
@@ -41,86 +50,21 @@ class Product:
         string.lower()
 
 
-    
+def match_text(text):
+    if match:= re.findall(r"([0-9]) for ([0-9])", text):
+        return int(match[0][1])/int(match[0][0]), 0
 
-def create_products(data, pointers):
-    # We need the title, the title, the original price, the new price, the saving text, the categories and the image 
-    for main_cat in data:
+    elif match:= re.findall(r"([0-9]+)% (on|per|ab) ([0-9])*.?", text):
+        return int(match[0][0])/100, int(match[0][2])
 
-        products = main_cat["json"]["elements"]
+    elif match:= re.findall(r"([0-9]+)% ([0-9]) or more", text):
+        return int(match[0][0])/100, int(match[0][1]) 
 
-        for product in products:
-
-            try:
-                product_obj = populate_product(product) 
-                print(product_obj.title)
-                pointers[product_obj.title] = product_obj
-            except Exception as e:
-                print(e, ", missing this value")
-
-    return pointers
-
-
-def populate_product(product):
-
-    try:
-        print(product)
-        obj = Product()
-
-        items = {"title": None,
-                "saving": None,
-                "price": None,
-                "savingText": None,
-                "udoCat": None,
-                "image": None}
-                    
-        for datapoint, value in product.items():
-            if datapoint in items.keys():
-                items[datapoint] = value
-                obj.items = items
-
-        obj.sanitise()
-        return obj
-
-    except Exception as e:
-        print(e)
-        return None
-
-def make_title(title, promotion):
-    try:
-        return "{} ({})".format(title, promotion)
-    except:
-        return title
-
-
-
-def build_tree(pointers):
-
-    coop = Node("Coop")
-
-    for obj in pointers.values():
-        edges = obj.udoCat
-        HEAD = coop
-
-        for edge in edges:
-            # create edge if it doesn't exist yet
-            # link product to the leaf
-            
-            if (answer := findall_by_attr(coop, edge)):
-                HEAD = answer[0]
-
-            else:
-                temp = Node(edge, parent=HEAD, tag="branch")
-                HEAD = temp
-        
-        product_title = make_title(obj.title, obj.savingText)
-        __product = Node(product_title, parent=HEAD, tag="product")
-
-    for pre, fill, node in RenderTree(coop):
-        print("%s%s" % (pre, node.name))
-
-    return coop
-
+    elif match:= re.findall(r"([0-9]+)%", text):
+        return int(match[0])/100, 0
+    else:
+        return 0.5, 0
+ 
 
 def read_html_file():
     with open("files/webpage.txt", encoding="utf-8") as f:
@@ -128,17 +72,104 @@ def read_html_file():
     return text
 
 
-def is_monday():
-    return True if dt.weekday(dt.now()) == 0 else False
+def strip(text):
+    pattern = r"<meta data-pagecontent-json='(.*?)'>"
+    match=re.findall(pattern, text)
+    json_data = json.loads(match[0])
+    anchors = json_data["anchors"]
+    return anchors
 
 
-def garbage_leaves():
-    """Go through all nodes and delete all product leaf nodes."""
-    ##for every node, if tag is product, then prune
+def populate_product(product):
 
-def query_filter():
+    obj = Item()
 
-    with open("files/keywords.txt") as f:
+    items = {"title": None,
+            "saving": None,
+            "price": None,
+            "savingText": None,
+            "udoCat": None,
+            "image": None}
+                
+    for datapoint, value in product.items():
+        if datapoint in items.keys():
+            items[datapoint] = value
+            obj.items = items
+
+    obj.sanitise()
+
+    return obj
+    
+
+def make_title(title, promotion):
+
+    try:
+        return "{} ({})".format(title, promotion)
+    except:
+        return title
+
+
+def build_tree(products):
+   
+    ### Import skeleton
+    if False:
+        tree = Item()
+        tree.name = "Coop"
+        tree.tag = "branch"
+    else:
+        importer = DictImporter()
+        with open("convert.json") as importf:
+            raw_tree = json.load(importf)
+        tree = importer.import_(raw_tree)
+
+    ### Add current deals to tree
+    for product in products:
+
+        HEAD = tree
+
+        try:
+            node = populate_product(product) 
+            if find(HEAD, lambda tmp: tmp.name == node.name):
+                continue
+            edges = node.udoCat
+ 
+            for edge in edges:
+            
+                if (answer := findall_by_attr(HEAD, edge)):
+                    HEAD = answer[0]
+
+                else:
+                    new_node = Item()
+                    new_node.name = edge
+                    new_node.tag = "branch"
+                    new_node.parent = HEAD
+                    HEAD = new_node
+            
+           # product_title = make_title(obj.title, obj.savingText)
+            node.parent = HEAD
+
+
+        except Exception as e:
+
+            print("We get the following error for product", e)
+            return None
+    
+    ### Print tree
+    for pre, fill, node in RenderTree(tree):
+        print("%s%s" % (pre, node.name))
+
+    ### Export skeleton
+    exporter = DictExporter(childiter=lambda children: [child for child in children if child.tag=="branch"])
+    saved_tree = exporter.export(tree)
+
+    with open('convert.json', 'w') as convert_file:
+         convert_file.write(json.dumps(saved_tree))
+
+    return tree
+
+
+def extract_keys(filename):
+    with open("files/{}".format(filename)) as f:
         inpt = f.read()
 
     exprs_pattern = r'"(.*?)"'
@@ -146,23 +177,33 @@ def query_filter():
     re.sub(r'"(.*?)"', "", inpt)
     single_words = re.split(r"\t|\n| ", inpt)
     keywords = single_words + exprs
-    keywords = [word for word in keywords if word != " "]
+    keywords = [word for word in keywords if word not in ["", " "]]
 
-    selected_objects = list()
+    return keywords
+
+
+def check_ancestors(ancestors, baskets):
+    for ancestor in ancestors:
+        if ancestor.name in baskets:
+            return True
+
+    return False
+
+
+def query_filter(tree):
+
     ## based on keywords
-    for title in pointers.keys():
-        for word in keywords:
-            if word in title:
-                product = pointers[title]
-                selected_objects.append(product)
+    keywords = extract_keys("keywords.txt")
+    selected_objects = findall(tree, lambda node: any(keyword for keyword in keywords if keyword in node.name))
 
     ## based on high discounts
-    big_whales = list()
+    big_whales = findall(tree, lambda node: node.tag == "product" and node.percentage > 0.3 and node.min_purchase < 2)
 
     ## based on categories
-    basket_selection = list()
+    basket_ids = extract_keys("baskets.txt")
+    baskets = findall(tree, lambda node: node.tag == "product" and check_ancestors(node.ancestors, basket_ids))
 
-    return selected_objects, big_whales, basket_selection
+    return selected_objects, big_whales, baskets
 
 
 def display_products(objects, filename, title):
@@ -174,17 +215,23 @@ def display_products(objects, filename, title):
                     with tag('h3'):
                         for obj in objects:
                             with tag('p'):
-                                text(obj.title)
+                                text(obj.name)
                             with tag('p'):
                                 text(obj.savingText)
-                            with tag('img', src=obj.image):
-                                text("Image")
-
+                                try:
+                                    text("\nCHF ", obj.price)
+                                except:
+                                    continue
+                            try:
+                                with tag('img', src=obj.image):
+                                    continue
+                            except:
+                                continue
     with open('{}.html'.format(filename), 'w') as f:
         f.write(doc.getvalue())
 
 
-def display_tree(selected_objects, tree):
+def display_tree(tree):
 
     doc, tag, text = Doc().tagtext()
     tree_struct = ""
@@ -205,16 +252,9 @@ def display_tree(selected_objects, tree):
         f.write(doc.getvalue())
                 
 
-def strip(text):
-    pattern = r"<meta data-pagecontent-json='(.*?)'>"
-    match=re.findall(pattern, text)
-    json_data = json.loads(match[0])
-    anchors = json_data["anchors"]
-    return anchors
-
 def main_loop():
-    if is_monday():
-        garbage_leaves()
+    #if is_monday():
+    #    garbage_leaves()
 
     offline = False
     if offline:
@@ -224,12 +264,12 @@ def main_loop():
         url = "https://www.coop.ch/en/promotions/weekly-special-offers/c/m_1011"
         session = requests.get(url)
         content = strip(session.text)
-        print(content)
 
-    product_pointers_empty = dict()
-    product_pointers = create_products(content, product_pointers_empty)
-    tree = build_tree(product_pointers)
-    selected, whales, cats = query_filter()
+    product_content=list()
+    for category in content:
+        product_content += category["json"]["elements"]
+    tree = build_tree(product_content)
+    selected, whales, cats = query_filter(tree)
 
     display_products(selected, filename="selection", title="Your wishlist")
     display_products(whales, filename="whales", title="$$$ Big discounts $$$")
@@ -246,6 +286,14 @@ if __name__=="__main__":
 
 
 
+###########################################################
+def is_monday():
+    return True if dt.weekday(dt.now()) == 0 else False
+
+
+def garbage_leaves():
+    """Go through all nodes and delete all product leaf nodes."""
+    ##for every node, if tag is product, then prune
 
 
 
